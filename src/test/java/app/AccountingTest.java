@@ -5,40 +5,28 @@ import static org.junit.Assert.*;
 import app.repository.IBudgetRepo;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
 
 public class AccountingTest {
 
-
     private Accounting accounting;
+    private FakeBudgetRepo fakeRepo = new FakeBudgetRepo();
 
     @Test
     public void fullMonth() {
-        accounting = new Accounting(new IBudgetRepo() {
-            @Override
-            public List<Budget> getAll() {
-                ArrayList<Budget> list = new ArrayList<>();
-                list.add(new Budget("201904",3000));
-                return list;
-            }
-        });
+        setFakeRepo(new Budget("201904",3000));
 
         LocalDate start = LocalDate.of(2019, 4, 1);
         LocalDate end = LocalDate.of(2019, 4, 30);
-        assertTrue(3000 == accounting.totalAmount(start, end));
+        amountShouldBe(start, end, 3000);
     }
 
     @Test
     public void OneDay() {
-        accounting = new Accounting(new IBudgetRepo() {
-            @Override
-            public List<Budget> getAll() {
-                ArrayList<Budget> list = new ArrayList<>();
-                list.add(new Budget("201904",3000));
-                return list;
-            }
-        });
+        setFakeRepo(new Budget("201904",3000));
+
         LocalDate start = LocalDate.of(2019, 4, 1);
         LocalDate end = LocalDate.of(2019, 4, 1);
         amountShouldBe(start, end, 100);
@@ -46,14 +34,8 @@ public class AccountingTest {
 
     @Test
     public void TwoDays() {
-        accounting = new Accounting(new IBudgetRepo() {
-            @Override
-            public List<Budget> getAll() {
-                ArrayList<Budget> list = new ArrayList<>();
-                list.add(new Budget("201904",3000));
-                return list;
-            }
-        });
+        setFakeRepo(new Budget("201904",3000));
+
         LocalDate start = LocalDate.of(2019, 4, 1);
         LocalDate end = LocalDate.of(2019, 4, 2);
         amountShouldBe(start, end, 200);
@@ -61,14 +43,8 @@ public class AccountingTest {
 
     @Test
     public void ThreeDays() {
-        accounting = new Accounting(new IBudgetRepo() {
-            @Override
-            public List<Budget> getAll() {
-                ArrayList<Budget> list = new ArrayList<>();
-                list.add(new Budget("201904",3000));
-                return list;
-            }
-        });
+        setFakeRepo(new Budget("201904",3000));
+
         LocalDate start = LocalDate.of(2019, 4, 1);
         LocalDate end = LocalDate.of(2019, 4, 3);
         amountShouldBe(start, end, 300);
@@ -77,7 +53,8 @@ public class AccountingTest {
 
     @Test
     public void noBudget() {
-        accounting = new Accounting(() -> new ArrayList<>());
+        setFakeRepo();
+
         LocalDate start = LocalDate.of(2019, 3, 1);
         LocalDate end = LocalDate.of(2019, 3, 10);
         amountShouldBe(start, end, 0);
@@ -85,12 +62,11 @@ public class AccountingTest {
 
     @Test
     public void CrossMonths() {
-        accounting = new Accounting(() -> {
-            ArrayList<Budget> list = new ArrayList<>();
-            list.add(new Budget("201901",3100));
-            list.add(new Budget("201902",1400));
-            return list;
-        });
+        setFakeRepo(
+                new Budget("201901",3100),
+                new Budget("201902",1400)
+        );
+
         LocalDate start = LocalDate.of(2019, 1, 31);
         LocalDate end = LocalDate.of(2019, 2, 1);
         amountShouldBe(start, end, 150);
@@ -98,13 +74,12 @@ public class AccountingTest {
 
     @Test
     public void CrossNoBudgetMonths() {
-        accounting = new Accounting(() -> {
-            ArrayList<Budget> list = new ArrayList<>();
-            list.add(new Budget("201902",1400));
-            list.add(new Budget("201903",3100));
-            list.add(new Budget("201904",3000));
-            return list;
-        });
+        setFakeRepo(
+                new Budget("201902",1400),
+                new Budget("201903",3100),
+                new Budget("201904",3000)
+        );
+
         LocalDate start = LocalDate.of(2019, 2, 1);
         LocalDate end = LocalDate.of(2019, 4, 1);
         amountShouldBe(start, end, 4600);
@@ -112,12 +87,11 @@ public class AccountingTest {
 
     @Test
     public void CrossYears() {
-        accounting = new Accounting(() -> {
-            ArrayList<Budget> list = new ArrayList<>();
-            list.add(new Budget("201812",3100));
-            list.add(new Budget("201901",3100));
-            return list;
-        });
+        setFakeRepo(
+                new Budget("201812",3100),
+                new Budget("201901",3100)
+        );
+
         LocalDate start = LocalDate.of(2018, 12, 31);
         LocalDate end = LocalDate.of(2019, 1, 1);
         amountShouldBe(start, end, 200);
@@ -125,15 +99,14 @@ public class AccountingTest {
 
     @Test
     public void ErrorDate() {
-        accounting = new Accounting(() -> {
-            ArrayList<Budget> list = new ArrayList<>();
-            list.add(new Budget("201812",3100));
-            list.add(new Budget("201901",3100));
-            list.add(new Budget("201902",2800));
-            list.add(new Budget("201904",3000));
-            list.add(new Budget("201912",3100));
-            return list;
-        });
+        setFakeRepo(
+                new Budget("201812",3100),
+                new Budget("201901",3100),
+                new Budget("201902",2800),
+                new Budget("201904",3000),
+                new Budget("201912",3100)
+        );
+
         LocalDate start = LocalDate.of(2019, 4, 1);
         LocalDate end = LocalDate.of(2019, 2, 1);
         amountShouldBe(start, end, 0);
@@ -143,7 +116,28 @@ public class AccountingTest {
         assertEquals(i, accounting.totalAmount(start, end), 0.00);
     }
 
+    private void setFakeRepo(Budget... data) {
+        accounting = new Accounting(
+                fakeRepo.withFakeData(
+                        (data == null || data.length == 0) ?
+                                new ArrayList<>() : Arrays.asList(data)
+                ));
+    }
 
+    class FakeBudgetRepo implements IBudgetRepo {
+
+        private List<Budget> fakeData;
+
+        @Override
+        public List<Budget> getAll() {
+            return fakeData;
+        }
+
+        public FakeBudgetRepo withFakeData(List<Budget> fakeData) {
+            this.fakeData = fakeData;
+            return this;
+        }
+    }
 }
 
 
